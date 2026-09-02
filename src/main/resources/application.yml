@@ -1,0 +1,80 @@
+# =============================================================================
+# Application Configuration — Fraud Detection Engine
+# =============================================================================
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: fraud-detection-engine
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — alert persistence
+  # ---------------------------------------------------------------------------
+  datasource:
+    url: jdbc:postgresql://localhost:5433/frauddb
+    username: frauduser
+    password: fraudpass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update          # Auto-create/update tables from entities
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # ---------------------------------------------------------------------------
+  # Kafka — event streaming
+  # ---------------------------------------------------------------------------
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # Idempotent producer: prevents duplicate messages when the producer
+      # retries due to transient network failures. Critical for financial data
+      # where a duplicate transaction event could mean a double charge.
+      properties:
+        enable.idempotence: true
+      acks: all                 # Strongest durability guarantee
+
+    consumer:
+      group-id: fraud-detection-group
+      auto-offset-reset: earliest   # Start from beginning if no committed offset
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # Trust our model package for JSON deserialization
+        spring.json.trusted.packages: "com.fraudengine.model"
+
+# =============================================================================
+# Fraud Detection Rules — configurable without code changes
+# =============================================================================
+fraud:
+  rules:
+    high-amount-threshold: 10000.00      # Flag transactions above $10,000
+    velocity-window-seconds: 300          # 5-minute sliding window
+    velocity-max-transactions: 5          # Max 5 transactions per window per account
+
+# =============================================================================
+# Actuator — health checks & metrics
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+# =============================================================================
+# Logging
+# =============================================================================
+logging:
+  level:
+    com.fraudengine: DEBUG
+    org.apache.kafka: WARN
+    org.hibernate.SQL: WARN

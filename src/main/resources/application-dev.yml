@@ -1,0 +1,43 @@
+# =============================================================================
+# DEV Profile — runs WITHOUT Docker (no Kafka, no Postgres)
+#
+# Uses:
+#   - H2 in-memory database (instead of PostgreSQL)
+#   - Kafka auto-startup disabled (transactions submitted via API are
+#     processed directly without Kafka, for quick local testing)
+#
+# Run with:
+#   java -jar target/fraud-detection-engine-1.0.0-SNAPSHOT.jar --spring.profiles.active=dev
+#   OR
+#   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# =============================================================================
+
+spring:
+  # H2 in-memory database — no Postgres needed
+  datasource:
+    url: jdbc:h2:mem:frauddb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  h2:
+    console:
+      enabled: true          # H2 console at http://localhost:9090/h2-console
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # Fresh DB each startup
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect    # Override the PostgreSQL dialect from base config
+        format_sql: true
+
+  # Disable Kafka entirely for dev mode
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+logging:
+  level:
+    com.fraudengine: DEBUG

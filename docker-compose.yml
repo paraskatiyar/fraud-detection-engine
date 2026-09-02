@@ -1,0 +1,73 @@
+# =============================================================================
+# Docker Compose — Fraud Detection Engine Infrastructure
+#
+# Brings up:
+#   1. Apache Kafka (KRaft mode — no Zookeeper dependency)
+#   2. PostgreSQL 16 (alert persistence)
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose down -v   (removes volumes too)
+#
+# KRaft mode: Kafka 3.3+ supports running without Zookeeper using the Raft
+# consensus protocol. This simplifies operations and is the future of Kafka.
+# =============================================================================
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    hostname: kafka
+    container_name: fraud-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft mode: this single node acts as both broker and controller
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+
+      # Listeners: internal (broker-to-broker) + external (host machine)
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+
+      # Cluster ID (pre-generated UUID for KRaft)
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+      # Single-node dev settings (replication factor = 1)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+      # Log retention: keep messages for 24h (sufficient for dev/demo)
+      KAFKA_LOG_RETENTION_HOURS: 24
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    hostname: postgres
+    container_name: fraud-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: frauddb
+      POSTGRES_USER: frauduser
+      POSTGRES_PASSWORD: fraudpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U frauduser -d frauddb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

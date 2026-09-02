@@ -1,0 +1,29 @@
+# =============================================================================
+# Test Profile Configuration
+#
+# Testcontainers dynamically injects spring.kafka.bootstrap-servers and
+# spring.datasource.url via @DynamicPropertySource, so we don't hardcode those.
+# This file only overrides settings that differ from the main config.
+# =============================================================================
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop    # Fresh DB per test run
+
+  kafka:
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.fraudengine.model"
+
+fraud:
+  rules:
+    high-amount-threshold: 10000.00
+    velocity-window-seconds: 300
+    velocity-max-transactions: 5
+
+logging:
+  level:
+    com.fraudengine: DEBUG
+    org.apache.kafka: WARN
